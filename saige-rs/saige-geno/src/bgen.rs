@@ -76,10 +76,15 @@ impl BgenReader {
         let sample_ids = if header.has_sample_ids {
             Self::parse_sample_ids(&data, &header)?
         } else {
-            // Try to read from .sample file
-            let sample_path = path.with_extension("sample");
-            if sample_path.exists() {
-                Self::parse_sample_file(&sample_path)?
+            // Try to read from .sample file (check multiple conventions)
+            let candidates = [
+                path.with_extension("sample"),                           // foo.sample
+                PathBuf::from(format!("{}.sample", path.display())),     // foo.bgen.sample
+                PathBuf::from(format!("{}.samples", path.display())),    // foo.bgen.samples
+            ];
+            let sample_file = candidates.iter().find(|p| p.exists());
+            if let Some(sample_path) = sample_file {
+                Self::parse_sample_file(sample_path)?
             } else {
                 (0..header.n_samples)
                     .map(|i| format!("sample_{}", i))
