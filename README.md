@@ -58,38 +58,26 @@ saige test \
 
 ### Benchmarks: saige-rs vs SAIGE R
 
-Benchmarked on the included test data (1,000 samples, 100 markers, covariates x1 + x2).
+Benchmarked on the included test data (1,000 samples, 100 markers, binary trait, covariates x1 + x2).
 
 **Environment:**
 - **saige-rs**: Native arm64 release binary on Apple Silicon (M-series Mac)
 - **SAIGE R v1.5.1**: Docker container (linux/amd64 via Rosetta 2 emulation)
-- Both single-threaded unless noted
+- Both single-threaded
 
-#### Step 1: Fit Null GLMM
-
-| Trait | SAIGE R | saige-rs | Speedup |
+| Step | SAIGE (R) | saige-rs (Rust) | Speedup |
 |---|---|---|---|
-| Binary | 60.8s | 1.15s | **53x** |
-| Quantitative | 64.3s | 0.34s | **189x** |
-| Quantitative (4 threads) | -- | 0.16s | **402x** |
+| Step 1: Fit null GLMM | 37.3s | 0.14s | **276x** |
+| Step 2: Association tests | 43.2s | 0.01s | **4,316x** |
+| **Total** | **80.5s** | **0.15s** | **555x** |
 
-The R wall times include Docker startup (~2s), R package loading (~5s), genotype I/O (~30s for 10K-sample PLINK file), and GLMM fitting. saige-rs times include the full pipeline end-to-end.
+R wall times include Docker/Rosetta 2 overhead. Native Linux R would be faster, but saige-rs is still orders of magnitude faster.
 
-Adjusting for Rosetta 2 overhead (~1.5-2x), saige-rs is conservatively **25-95x faster** than native R on the same hardware.
+#### P-value concordance
 
-#### Step 2: Single-Variant Association Tests (70 variants tested)
+Both implementations produce correlated p-values (Pearson *r* = 0.72 on −log₁₀ scale, *r* = 0.98 on raw scale) across 70 tested variants with SPA correction enabled.
 
-| Format | SAIGE R | saige-rs | Speedup |
-|---|---|---|---|
-| PLINK | 20.2s | 0.025s | **808x** |
-| BGEN | -- | 0.022s | -- |
-
-The R Step 2 wall time includes Docker startup, R loading, genotype reading, and testing 70 variants. saige-rs times are end-to-end including I/O.
-
-#### Notes
-
-- R times include Rosetta 2 emulation overhead since the SAIGE R package requires a Linux x86_64 environment (building natively on macOS arm64 requires pixi and plink-ng). Native Linux R performance would be faster.
-- saige-rs multi-threading (via rayon) shows near-linear scaling for GRM construction and trace estimation.
-- Both implementations tested the same 70 variants and produced concordant results.
-- Test dataset: `extdata/input/genotype_100markers` (1,000 phenotyped samples out of 10,000 in the genotype file).
+<p align="center">
+  <img src="saige-rs/docs/pvalue_comparison.png" width="480" alt="P-value comparison between SAIGE R and saige-rs" />
+</p>
 

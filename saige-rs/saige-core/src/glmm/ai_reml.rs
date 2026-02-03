@@ -99,6 +99,10 @@ where
 
     let family = Family::new(trait_type);
 
+    // For binary/survival traits, tau_e (dispersion) is fixed at 1.0.
+    // Only tau_g (genetic variance) is estimated. This matches R SAIGE.
+    let fix_tau_e = matches!(trait_type, TraitType::Binary | TraitType::Survival);
+
     // Initialize
     let mut tau = [1.0, 1.0]; // [tau_e, tau_g]
 
@@ -252,29 +256,41 @@ where
         let ai_11 = 0.5 * DenseMatrix::dot(&grm_p_y, &pcg_grm_py.x);
 
         // Update tau: tau_new = tau_old + AI^{-1} * score
-        let ai_det = ai_00 * ai_11 - ai_01 * ai_01;
-        if ai_det.abs() < 1e-30 {
-            warn!("AI matrix is singular at iteration {}", iter);
-            break;
-        }
-
-        let delta_0 = (ai_11 * score[0] - ai_01 * score[1]) / ai_det;
-        let delta_1 = (-ai_01 * score[0] + ai_00 * score[1]) / ai_det;
-
-        let tau_new = [(tau[0] + delta_0).max(1e-10), (tau[1] + delta_1).max(1e-10)];
-
-        // Check convergence
-        let change_0 = (tau_new[0] - tau[0]).abs() / (tau_new[0].abs() + tau[0].abs() + config.tol);
-        let change_1 = (tau_new[1] - tau[1]).abs() / (tau_new[1].abs() + tau[1].abs() + config.tol);
+        let (tau_new, max_change) = if fix_tau_e {
+            // Binary/survival: tau_e fixed at 1.0, scalar update for tau_g only
+            if ai_11.abs() < 1e-30 {
+                warn!("AI[1,1] is near-zero at iteration {}", iter);
+                break;
+            }
+            let delta_1 = score[1] / ai_11;
+            let tau_g_new = (tau[1] + delta_1).max(1e-10);
+            let change_1 =
+                (tau_g_new - tau[1]).abs() / (tau_g_new.abs() + tau[1].abs() + config.tol);
+            ([1.0, tau_g_new], change_1)
+        } else {
+            // Quantitative: full 2x2 AI update for both components
+            let ai_det = ai_00 * ai_11 - ai_01 * ai_01;
+            if ai_det.abs() < 1e-30 {
+                warn!("AI matrix is singular at iteration {}", iter);
+                break;
+            }
+            let delta_0 = (ai_11 * score[0] - ai_01 * score[1]) / ai_det;
+            let delta_1 = (-ai_01 * score[0] + ai_00 * score[1]) / ai_det;
+            let t = [(tau[0] + delta_0).max(1e-10), (tau[1] + delta_1).max(1e-10)];
+            let change_0 = (t[0] - tau[0]).abs() / (t[0].abs() + tau[0].abs() + config.tol);
+            let change_1 = (t[1] - tau[1]).abs() / (t[1].abs() + tau[1].abs() + config.tol);
+            (t, change_0.max(change_1))
+        };
 
         debug!(
-            "AI-REML iter {}: tau=[{:.6}, {:.6}], change=[{:.2e}, {:.2e}]",
-            iter, tau_new[0], tau_new[1], change_0, change_1
+            "AI-REML iter {}: tau=[{:.6}, {:.6}], change={:.2e}{}",
+            iter, tau_new[0], tau_new[1], max_change,
+            if fix_tau_e { " (tau_e fixed)" } else { "" }
         );
 
         tau = tau_new;
 
-        if change_0 < config.tol && change_1 < config.tol {
+        if max_change < config.tol {
             info!("AI-REML converged after {} iterations", iter + 1);
             converged = true;
             break;
