@@ -58,7 +58,7 @@ saige test \
 
 ### Benchmarks: saige-rs vs SAIGE R
 
-Benchmarked on the included test data (1,000 samples, 10K GRM markers, 100 test variants, binary trait, covariates x1 + x2).
+Benchmarked on simulated data (2,000 samples, 5K GRM markers, 2,000 test variants across the MAF spectrum, binary trait with ~10% prevalence, covariates x1 + x2, LOCO=FALSE).
 
 **Environment:**
 - **saige-rs**: Native arm64 release binary on Apple Silicon (M-series Mac)
@@ -67,15 +67,15 @@ Benchmarked on the included test data (1,000 samples, 10K GRM markers, 100 test 
 
 | Step | SAIGE (R) | saige-rs (Rust) | Speedup |
 |---|---|---|---|
-| Step 1: Fit null GLMM | 34.9s | 16.1s | **2x** |
-| Step 2: Association tests | 28.9s | 0.03s | **963x** |
-| **Total** | **63.8s** | **16.1s** | **4x** |
+| Step 1: Fit null GLMM | 43.7s | 15.5s | **2.8x** |
+| Step 2: Association tests | 29.4s | 0.12s | **245x** |
+| **Total** | **73.1s** | **15.6s** | **4.7x** |
 
 R wall times include Docker/Rosetta 2 overhead. Step 1 is dominated by GRM computation (O(n²m)), so the speedup is modest; step 2 is orders of magnitude faster.
 
 #### P-value concordance
 
-Both implementations produce highly concordant p-values (Pearson *r* = 0.993 on −log₁₀ scale for MAF ≥ 0.01) across 70 tested variants with SPA correction enabled.
+Both implementations produce highly concordant p-values across 1,998 tested variants with SPA correction enabled. Concordance is strongest for low-frequency and rare variants (Pearson *r* > 0.997 on −log₁₀ scale for MAF < 0.05), with overall *r* = 0.946 across all MAF categories.
 
 <p align="center">
   <img src="saige-rs/docs/pvalue_comparison.png" width="700" alt="P-value comparison and runtime benchmarks between SAIGE R and saige-rs" />
