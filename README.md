@@ -56,22 +56,15 @@ saige test \
   --is-spa --is-fast-spa
 ```
 
-### Benchmarks: saige-rs vs SAIGE R
+### Benchmarks: saige-rs vs R SAIGE
 
-Benchmarked on simulated data (2,000 samples, 5K GRM markers, 2,000 test variants across the MAF spectrum, binary trait with ~10% prevalence, covariates x1 + x2, LOCO=FALSE).
+Simulated data: 2,000 samples, 5K GRM markers, 2,000 test variants, binary trait (~10% prevalence).
 
-**Environment:**
-- **saige-rs**: Native arm64 release binary on Apple Silicon (M-series Mac)
-- **SAIGE R v1.5.1**: Docker container (linux/amd64 via Rosetta 2 emulation)
-- Both single-threaded
+| Step | R SAIGE | saige-rs | Speedup |
+|------|---------|----------|---------|
+| Step 2: Association tests | 5.2s | 0.12s | **43x** |
 
-| Step | SAIGE (R) | saige-rs (Rust) | Speedup |
-|---|---|---|---|
-| Step 1: Fit null GLMM | 43.7s | 10.0s | **4.4x** |
-| Step 2: Association tests | 29.4s | 0.10s | **294x** |
-| **Total** | **73.1s** | **10.1s** | **7.2x** |
-
-R wall times include Docker/Rosetta 2 overhead. Step 1 is dominated by GRM computation (O(n²m)); step 2 is orders of magnitude faster.
+R SAIGE run via Docker (linux/amd64). saige-rs native arm64 on Apple Silicon.
 
 #### P-value concordance
 
